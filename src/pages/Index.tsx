@@ -22,8 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { generateProjectName } from "@/utils/projectNameGenerator";
-import { generateExecutionPlan } from "@/services/aiService";
-import { executeCommands } from "@/services/executionService";
+import { generateExecutionPlan, executeCommands, autoOptimize } from "@/services/aiService";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -39,12 +38,13 @@ const Index = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
-      text: "How can I help you today?",
+      text: "I'm your AI software engineer assistant. How can I help you today?",
       type: "system",
       timestamp: new Date(),
     },
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentProject, setCurrentProject] = useState(generateProjectName());
 
   const handleSendMessage = async () => {
     if (!message.trim() || isProcessing) return;
@@ -62,9 +62,8 @@ const Index = () => {
       setMessages(prev => [...prev, userMessage]);
       setMessage("");
 
-      // Generate project name and execution plan
-      const projectName = generateProjectName();
-      const plan = await generateExecutionPlan(projectName, message);
+      // Generate execution plan
+      const plan = await generateExecutionPlan(currentProject, message);
 
       if (!plan) {
         throw new Error("Failed to generate execution plan");
@@ -73,25 +72,30 @@ const Index = () => {
       // Add system message about the plan
       setMessages(prev => [...prev, {
         id: `${Date.now()}-plan`,
-        text: `I've generated a plan for project "${projectName}". Would you like to review it?`,
+        text: `I've analyzed your request and generated a plan. Proceeding with execution...`,
         type: "system",
         timestamp: new Date(),
       }]);
 
       // Execute the plan
-      const result = await executeCommands(plan);
+      const success = await executeCommands(plan);
+
+      if (success) {
+        // Run auto-optimization
+        await autoOptimize(currentProject);
+      }
 
       // Add final status message
       setMessages(prev => [...prev, {
         id: `${Date.now()}-result`,
-        text: result.success 
-          ? "All operations completed successfully!"
-          : "Some operations failed. Check the console for details.",
+        text: success 
+          ? "Changes have been applied successfully! Let me know if you need anything else."
+          : "Some operations couldn't be completed. Please check the console for details.",
         type: "system",
         timestamp: new Date(),
       }]);
 
-      if (!result.success) {
+      if (!success) {
         toast({
           variant: "destructive",
           title: "Execution Error",
@@ -106,6 +110,13 @@ const Index = () => {
         title: "Error",
         description: "Failed to process your request. Please try again.",
       });
+      
+      setMessages(prev => [...prev, {
+        id: `${Date.now()}-error`,
+        text: "An error occurred while processing your request. Please try again.",
+        type: "system",
+        timestamp: new Date(),
+      }]);
     } finally {
       setIsProcessing(false);
     }
@@ -128,7 +139,7 @@ const Index = () => {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">
-        Welcome to the Sandbox
+        Project: ${currentProject}
       </h1>
       <p>Start editing to see your changes!</p>
     </div>
@@ -167,7 +178,7 @@ const Index = () => {
 
       <ExpandableChat>
         <ExpandableChatHeader>
-          <h3 className="text-lg font-semibold">Chat Support</h3>
+          <h3 className="text-lg font-semibold">AI Engineer Assistant</h3>
         </ExpandableChatHeader>
         <ExpandableChatBody className="p-4">
           <div className="space-y-4">
@@ -189,7 +200,7 @@ const Index = () => {
         <ExpandableChatFooter>
           <div className="flex gap-2">
             <Input
-              placeholder="Type a message..."
+              placeholder="Type your development request..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
