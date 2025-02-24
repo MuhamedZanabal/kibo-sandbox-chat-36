@@ -67,7 +67,7 @@ export const generateExecutionPlan = async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
+        model: 'Qwen/Qwen2.5-Coder-32B-Instruct',
         messages: messages,
         temperature: 0.7,
         max_tokens: 2000
