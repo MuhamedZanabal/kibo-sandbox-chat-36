@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { generateProjectName } from "@/utils/projectNameGenerator";
 import { generateExecutionPlan } from "@/services/aiService";
 import { executeCommands } from "@/services/executionService";
+import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   id: string;
@@ -113,7 +114,7 @@ const Index = () => {
   return (
     <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
       <main className="flex-1 p-4">
-        <SandpackProvider
+        <SandboxProvider
           template="react"
           customSetup={{
             dependencies: {
@@ -161,7 +162,7 @@ const Index = () => {
               </SandboxTabsContent>
             </SandboxTabs>
           </SandboxLayout>
-        </SandpackProvider>
+        </SandboxProvider>
       </main>
 
       <ExpandableChat>
