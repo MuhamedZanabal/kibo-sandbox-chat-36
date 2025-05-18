@@ -1,5 +1,6 @@
+
 import OpenAI from 'openai';
-import { useToast } from "@/components/ui/use-toast";
+// import { useToast } from "@/components/ui/use-toast"; // useToast is a hook, cannot be used here.
 import { generateProjectName } from "@/utils/projectNameGenerator";
 
 const FULL_STACK_GUIDELINES = `
@@ -91,10 +92,7 @@ export const generateExecutionPlan = async (
 
     if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_API_KEY_HERE") {
       console.error("OpenRouter API key is not set. Please update it in src/services/aiService.ts");
-      // Potentially use toast here, but useToast is a hook and cannot be used in a non-component function.
-      // For now, we'll rely on the console error and return null.
-      // A more robust solution would involve global state or a dedicated error reporting mechanism.
-      alert("OpenRouter API key is not configured. Please check the console and update the code.");
+      alert("OpenRouter API key is not configured. Please check the console and update the code. This app will not function correctly until this is resolved.");
       return null;
     }
 
@@ -110,11 +108,11 @@ export const generateExecutionPlan = async (
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'qwen/qwen-2.5-coder-32b-instruct', // Using the same model, ensure it's available on OpenRouter
+      model: 'qwen/qwen-2.5-coder-32b-instruct', 
       messages: messages,
       temperature: 0.3,
-      max_tokens: 2000,
-      response_format: { type: "json_object" }, // Request JSON output if model supports it
+      max_tokens: 2000, // Increased max_tokens for potentially larger plans
+      response_format: { type: "json_object" },
     });
 
     console.log('OpenRouter API Response:', response);
@@ -122,22 +120,23 @@ export const generateExecutionPlan = async (
     const messageContent = response.choices?.[0]?.message?.content;
 
     if (!messageContent) {
-      throw new Error('Invalid API response format from OpenRouter');
+      throw new Error('Invalid API response format from OpenRouter: No message content');
     }
 
     try {
-      // The OpenAI SDK should ideally parse JSON if response_format is json_object and model supports it.
-      // If it's a string, we parse.
       const planJson = typeof messageContent === 'string' ? JSON.parse(messageContent) : messageContent;
       
-      if (!planJson.commands || !planJson.shell_commands || !planJson.post_execution) {
-        throw new Error('Invalid execution plan structure from OpenRouter response');
+      // Basic validation of the plan structure
+      if (!planJson || typeof planJson !== 'object' || !Array.isArray(planJson.commands) || !Array.isArray(planJson.shell_commands) || typeof planJson.post_execution !== 'object') {
+        console.error('Invalid execution plan structure from OpenRouter response:', planJson);
+        throw new Error('Invalid execution plan structure from OpenRouter response. Ensure the AI returns commands, shell_commands, and post_execution.');
       }
 
       return planJson as ExecutionPlan;
     } catch (parseError) {
       console.error('Error parsing AI response from OpenRouter:', parseError);
       console.log('Raw AI response content:', messageContent);
+      // It might be useful to return a structured error or a partial plan if applicable
       return null;
     }
 
@@ -151,35 +150,44 @@ export const generateExecutionPlan = async (
         type: error.type,
       });
     }
+    // Consider how to inform the user more gracefully, perhaps via a toast from the calling component
+    // For now, returning null signifies failure to the caller.
     return null;
   }
 };
 
-export const executeCommands = async (plan: ExecutionPlan): Promise<boolean> => {
-  try {
-    // Execute file operations
-    for (const command of plan.commands) {
-      console.log(`Executing ${command.type} operation on ${command.path}`);
-      // File operations will be handled by the frontend
-    }
+// The executeCommands function previously here is now removed.
+// Its responsibilities are handled by executionService.ts
 
-    // Execute shell commands if needed
-    for (const cmd of plan.shell_commands) {
-      console.log(`Would execute shell command: ${cmd.command}`);
-      // Shell commands will be logged but not executed in the frontend
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error executing commands:', error);
-    return false;
+export const autoOptimize = async (
+  projectName: string,
+  userPromptContext: string, // Context from the user's last request
+  executedPlanContext?: ExecutionPlan // Context from the plan that was just executed
+): Promise<ExecutionPlan | null> => {
+  console.log('Auto-optimization: Preparing to generate optimization plan for:', projectName);
+  let optimizationPrompt = "Analyze the current project files and suggest optimizations for code quality, readability, and performance. Prioritize changes that improve maintainability and adhere to best practices. If recent changes were made, consider them in your analysis.";
+  
+  if (userPromptContext) {
+    optimizationPrompt += `\n\nThe last user development request was: "${userPromptContext}"`;
   }
-};
+  if (executedPlanContext && executedPlanContext.commands.length > 0) {
+    const relevantPaths = Array.from(new Set(executedPlanContext.commands.map(c => c.path))).join(', ');
+    optimizationPrompt += `\n\nThe following files were recently modified: ${relevantPaths}. Focus optimizations on these files or related logic if appropriate, or perform general project optimization. Ensure any new code follows the established project guidelines.`;
+  } else {
+    optimizationPrompt += "\nPerform a general project optimization."
+  }
+  optimizationPrompt += "\n\nReturn a standard ExecutionPlan JSON object."
 
-export const autoOptimize = async (projectName: string): Promise<void> => {
-  console.log('Running auto-optimization for:', projectName);
-  const plan = await generateExecutionPlan(projectName, "Analyze and optimize all existing project files.");
+  console.log('Auto-optimization prompt:', optimizationPrompt);
+
+  const plan = await generateExecutionPlan(projectName, optimizationPrompt);
+  
   if (plan) {
-    await executeCommands(plan);
+    console.log('Auto-optimization plan generated successfully:', plan);
+    return plan;
   }
+  
+  console.log('Auto-optimization: Failed to generate an optimization plan.');
+  return null;
 };
+
