@@ -1,4 +1,4 @@
-
+import OpenAI from 'openai';
 import { useToast } from "@/components/ui/use-toast";
 import { generateProjectName } from "@/utils/projectNameGenerator";
 
@@ -44,7 +44,16 @@ export interface ExecutionPlan {
   };
 }
 
-const DEEPINFRA_API_URL = 'https://api.deepinfra.com/v1/openai/chat/completions';
+// IMPORTANT: Replace with your actual OpenRouter API key
+const OPENROUTER_API_KEY = "YOUR_OPENROUTER_API_KEY_HERE"; 
+const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
+
+// Initialize OpenAI client for OpenRouter
+const openai = new OpenAI({
+  baseURL: OPENROUTER_API_BASE_URL,
+  apiKey: OPENROUTER_API_KEY,
+  dangerouslyAllowBrowser: true, // Required for client-side usage
+});
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -77,10 +86,19 @@ export const generateExecutionPlan = async (
   userPrompt: string
 ): Promise<ExecutionPlan | null> => {
   try {
-    console.log('Generating execution plan for:', projectName);
+    console.log('Generating execution plan for:', projectName, 'using OpenRouter');
     console.log('User prompt:', userPrompt);
 
-    const messages: Message[] = [
+    if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_API_KEY_HERE") {
+      console.error("OpenRouter API key is not set. Please update it in src/services/aiService.ts");
+      // Potentially use toast here, but useToast is a hook and cannot be used in a non-component function.
+      // For now, we'll rely on the console error and return null.
+      // A more robust solution would involve global state or a dedicated error reporting mechanism.
+      alert("OpenRouter API key is not configured. Please check the console and update the code.");
+      return null;
+    }
+
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
         content: createSystemPrompt(projectName)
@@ -91,46 +109,48 @@ export const generateExecutionPlan = async (
       }
     ];
 
-    const response = await fetch(DEEPINFRA_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'Qwen/Qwen2.5-Coder-32B-Instruct',
-        messages: messages,
-        temperature: 0.3,
-        max_tokens: 2000
-      })
+    const response = await openai.chat.completions.create({
+      model: 'qwen/qwen-2.5-coder-32b-instruct', // Using the same model, ensure it's available on OpenRouter
+      messages: messages,
+      temperature: 0.3,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }, // Request JSON output if model supports it
     });
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
+    console.log('OpenRouter API Response:', response);
 
-    const data = await response.json();
-    console.log('API Response:', data);
+    const messageContent = response.choices?.[0]?.message?.content;
 
-    if (!data.choices?.[0]?.message?.content) {
-      throw new Error('Invalid API response format');
+    if (!messageContent) {
+      throw new Error('Invalid API response format from OpenRouter');
     }
 
     try {
-      const planJson = JSON.parse(data.choices[0].message.content);
+      // The OpenAI SDK should ideally parse JSON if response_format is json_object and model supports it.
+      // If it's a string, we parse.
+      const planJson = typeof messageContent === 'string' ? JSON.parse(messageContent) : messageContent;
       
       if (!planJson.commands || !planJson.shell_commands || !planJson.post_execution) {
-        throw new Error('Invalid execution plan structure');
+        throw new Error('Invalid execution plan structure from OpenRouter response');
       }
 
       return planJson as ExecutionPlan;
     } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
-      console.log('Raw AI response:', data.choices[0].message.content);
+      console.error('Error parsing AI response from OpenRouter:', parseError);
+      console.log('Raw AI response content:', messageContent);
       return null;
     }
 
   } catch (error) {
-    console.error('Error generating execution plan:', error);
+    console.error('Error generating execution plan via OpenRouter:', error);
+    if (error instanceof OpenAI.APIError) {
+      console.error('OpenAI API Error Details:', {
+        status: error.status,
+        message: error.message,
+        code: error.code,
+        type: error.type,
+      });
+    }
     return null;
   }
 };
