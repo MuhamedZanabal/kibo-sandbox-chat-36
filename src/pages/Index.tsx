@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react"; // Added useEffect for potential future use
+import { useState, useEffect } from "react";
 import {
   SandboxProvider,
   SandboxLayout,
@@ -11,8 +11,8 @@ import {
   SandboxPreview,
   SandboxConsole,
   SandboxFileExplorer,
-  useSandpack, // Import useSandpack
 } from "@/components/ui/sandbox";
+import { useSandpack } from "@codesandbox/sandpack-react"; // Changed import source
 import {
   ExpandableChat,
   ExpandableChatHeader,
@@ -23,8 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { generateProjectName } from "@/utils/projectNameGenerator";
-import { generateExecutionPlan, autoOptimize, type ExecutionPlan } from "@/services/aiService"; // ExecutionPlan type
-import { executeFileCommands, type SandpackFileOperations, type ExecutionResult } from "@/services/executionService"; // executeFileCommands and types
+import { generateExecutionPlan, autoOptimize, type ExecutionPlan } from "@/services/aiService";
+import { executeFileCommands, type SandpackFileOperations, type ExecutionResult } from "@/services/executionService";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -32,10 +32,10 @@ interface ChatMessage {
   text: string;
   type: "user" | "system";
   timestamp: Date;
-  details?: any; // For storing execution plan details or errors
+  details?: any;
 }
 
-const IndexPageContent = () => { // Renamed Index to IndexPageContent to use useSandpack
+const IndexPageContent = () => {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -49,7 +49,7 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentProject, setCurrentProject] = useState(generateProjectName());
   
-  const { sandpack } = useSandpack(); // Get sandpack client instance
+  const { sandpack } = useSandpack();
 
   const handleSendMessage = async () => {
     if (!message.trim() || isProcessing) return;
@@ -66,7 +66,6 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
     setMessage("");
 
     try {
-      // Generate execution plan
       setMessages(prev => [...prev, { id: `${Date.now()}-planning`, text: "Generating execution plan...", type: "system", timestamp: new Date() }]);
       const plan = await generateExecutionPlan(currentProject, userMessageText);
 
@@ -94,14 +93,12 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
         details: { commands: plan.commands.map(c => `${c.type} ${c.path}`) }
       }]);
 
-      // Prepare Sandpack operations
       const sandpackOps: SandpackFileOperations = {
         updateFile: sandpack.updateFile,
         deleteFile: sandpack.deleteFile,
         addFile: sandpack.addFile,
       };
 
-      // Execute the plan
       const executionResult = await executeFileCommands(plan, sandpackOps);
       
       executionResult.logs.forEach(log => console.log("Execution Log:", log));
@@ -138,7 +135,7 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
           toast({
             title: optResult.success ? "Optimization Successful" : "Optimization Issue",
             description: optResult.success ? "Code optimized." : "Optimization had issues. Check console.",
-            variant: optResult.success ? "default" : "warning",
+            variant: optResult.success ? "default" : "default", // Changed "warning" to "default"
           });
         } else if (optimizationPlan && optimizationPlan.commands.length === 0) {
             finalSystemMessageText += "Auto-optimization analysis found no immediate actions to take.";
@@ -162,7 +159,7 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
         text: finalSystemMessageText,
         type: "system",
         timestamp: new Date(),
-        details: executionResult // Store full result for potential display/debugging
+        details: executionResult
       }]);
 
     } catch (error) {
@@ -184,7 +181,6 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
     }
   };
   
-  // Update App.js content when currentProject changes
   useEffect(() => {
     sandpack.updateFile("/App.js", `export default function App() {
   return (
@@ -201,9 +197,7 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
-      <main className="flex-1 p-4 overflow-hidden"> {/* Added overflow-hidden to main */}
-        {/* SandboxLayout will be rendered by SandboxProvider which is now wrapping IndexPageContent */}
-        {/* The SandboxProvider related JSX is moved to a new wrapper component */}
+      <main className="flex-1 p-4 overflow-hidden">
         <SandboxLayout>
           <SandboxTabs defaultValue="editor">
             <SandboxTabsList>
@@ -211,7 +205,7 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
               <SandboxTabsTrigger value="preview">Preview</SandboxTabsTrigger>
               <SandboxTabsTrigger value="console">Console</SandboxTabsTrigger>
             </SandboxTabsList>
-            <SandboxTabsContent value="editor" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]"> {/* Adjusted height */}
+            <SandboxTabsContent value="editor" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]">
               <div className="grid grid-cols-4 h-full">
                 <div className="col-span-1 border-r">
                   <SandboxFileExplorer />
@@ -221,10 +215,10 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
                 </div>
               </div>
             </SandboxTabsContent>
-            <SandboxTabsContent value="preview" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]"> {/* Adjusted height */}
+            <SandboxTabsContent value="preview" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]">
               <SandboxPreview />
             </SandboxTabsContent>
-            <SandboxTabsContent value="console" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]"> {/* Adjusted height */}
+            <SandboxTabsContent value="console" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]">
               <SandboxConsole />
             </SandboxTabsContent>
           </SandboxTabs>
@@ -241,7 +235,7 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
               <div
                 key={msg.id}
                 className={cn(
-                  "p-3 rounded-lg max-w-[80%] break-words", // Added break-words
+                  "p-3 rounded-lg max-w-[80%] break-words",
                   msg.type === "user"
                     ? "bg-primary text-primary-foreground ml-auto"
                     : "bg-secondary"
@@ -287,67 +281,85 @@ const IndexPageContent = () => { // Renamed Index to IndexPageContent to use use
   );
 };
 
-// New wrapper component to provide Sandpack context
 const Index = () => {
-  // Default files for Sandpack, currentProject needs to be initialized or passed if dynamic project name is needed here
-  // For simplicity, using a static name or default generated one for initial setup.
-  // If currentProject in IndexPageContent needs to affect this, state needs to be lifted or context used.
-  // For now, this initial App.js uses a static project name.
-  // The useEffect in IndexPageContent will update it once that component mounts and currentProject state is set.
   const initialProjectName = generateProjectName(); 
 
   return (
     <SandboxProvider
-      template="react"
+      template="react-ts" // Changed template to react-ts for better TS support
       customSetup={{
         dependencies: {
-          "react": "^18.2.0", // Ensure versions are robust
+          "react": "^18.2.0",
           "react-dom": "^18.2.0",
-          "lucide-react": "latest", // Example: ensure common UI deps are available
+          "lucide-react": "latest",
+          // Consider adding tailwindcss and other common deps if sandpack doesn't include them by default with react-ts
         },
-        entry: "/index.js", // Default entry
-        main: "/App.js", // Main component
+        entry: "/index.tsx", // Adjusted entry for TypeScript
+        // Removed 'main' property as it's not a standard SandpackSetup property
       }}
       files={{
-        "/App.js": {
+        "/App.tsx": { // Changed to App.tsx
           code: `import React from 'react';
 export default function App() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">
-        Project: ${initialProjectName} {/* Use initial name here */}
+        Project: ${initialProjectName}
       </h1>
       <p>Welcome to your project! Start by asking the AI to make changes.</p>
       <p className="mt-4 text-sm text-muted-foreground">
-        For example: "Create a new component called MyButton with green background and text 'Click Me'. Then use it in App.js."
+        For example: "Create a new component called MyButton with green background and text 'Click Me'. Then use it in App.tsx."
       </p>
     </div>
   );
 }`,
         },
-        "/index.js": { // Default entry point for React projects in Sandpack
+        "/index.tsx": { // Changed to index.tsx
           code: `import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-// You might want to import a global CSS file here if needed
-// import './styles.css'; 
+// import './styles.css'; // If you add a styles.css, ensure it's in files too
 
-const root = createRoot(document.getElementById('root'));
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('Failed to find the root element');
+
+const root = createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );`,
         },
-        // "/styles.css": { // Example for global styles
-        //   code: `body { font-family: sans-serif; margin: 20px; padding: 0; }`
+        // Ensure tsconfig.json is implicitly handled by "react-ts" template or add a basic one if needed
+        // "/tsconfig.json": {
+        //   code: JSON.stringify({
+        //     compilerOptions: {
+        //       target: "esnext",
+        //       lib: ["dom", "dom.iterable", "esnext"],
+        //       allowJs: true,
+        //       skipLibCheck: true,
+        //       esModuleInterop: true,
+        //       allowSyntheticDefaultImports: true,
+        //       strict: true,
+        //       forceConsistentCasingInFileNames: true,
+        //       noFallthroughCasesInSwitch: true,
+        //       module: "esnext",
+        //       moduleResolution: "node",
+        //       resolveJsonModule: true,
+        //       isolatedModules: true,
+        //       noEmit: true,
+        //       jsx: "react-jsx"
+        //     },
+        //     include: ["src", "**/*.ts", "**/*.tsx"], // Adjust include paths based on Sandpack structure
+        //     exclude: ["node_modules"]
+        //   }, null, 2)
         // }
       }}
       options={{
-        activeFile: "/App.js",
-        visibleFiles: ["/App.js", "/index.js"],
-        editorHeight: "70vh", // Default height, can be overridden by SandboxTabsContent
-        // theme: "dark", // Optional: set a theme
+        activeFile: "/App.tsx", // Changed to App.tsx
+        visibleFiles: ["/App.tsx", "/index.tsx"], // Changed to .tsx
+        // Removed 'editorHeight' as it's not a standard SandpackProvider option
+        // theme: "dark", 
       }}
     >
       <IndexPageContent />
@@ -356,4 +368,3 @@ root.render(
 };
 
 export default Index;
-
