@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   SandboxProvider,
   SandboxLayout,
@@ -12,7 +11,7 @@ import {
   SandboxConsole,
   SandboxFileExplorer,
 } from "@/components/ui/sandbox";
-import { useSandpack } from "@codesandbox/sandpack-react"; // Changed import source
+import { useSandpack } from "@codesandbox/sandpack-react";
 import {
   ExpandableChat,
   ExpandableChatHeader,
@@ -26,14 +25,8 @@ import { generateProjectName } from "@/utils/projectNameGenerator";
 import { generateExecutionPlan, autoOptimize, type ExecutionPlan } from "@/services/aiService";
 import { executeFileCommands, type SandpackFileOperations, type ExecutionResult } from "@/services/executionService";
 import { cn } from "@/lib/utils";
-
-interface ChatMessage {
-  id: string;
-  text: string;
-  type: "user" | "system";
-  timestamp: Date;
-  details?: any;
-}
+import { ChatMessage } from '@/types/chat';
+import ChatMessageList from '@/components/ChatMessageList';
 
 const IndexPageContent = () => {
   const { toast } = useToast();
@@ -50,6 +43,7 @@ const IndexPageContent = () => {
   const [currentProject, setCurrentProject] = useState(generateProjectName());
   
   const { sandpack } = useSandpack();
+  const chatBodyRef = useRef<HTMLDivElement>(null);
 
   const handleSendMessage = async () => {
     if (!message.trim() || isProcessing) return;
@@ -194,6 +188,12 @@ const IndexPageContent = () => {
 }`);
   }, [currentProject, sandpack]);
 
+  useEffect(() => {
+    // Auto-scroll to the bottom of the chat body when messages change
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
@@ -229,33 +229,8 @@ const IndexPageContent = () => {
         <ExpandableChatHeader>
           <h3 className="text-lg font-semibold">AI Engineer Assistant ({currentProject})</h3>
         </ExpandableChatHeader>
-        <ExpandableChatBody className="p-4">
-          <div className="space-y-4">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  "p-3 rounded-lg max-w-[80%] break-words",
-                  msg.type === "user"
-                    ? "bg-primary text-primary-foreground ml-auto"
-                    : "bg-secondary"
-                )}
-              >
-                <p className="font-semibold text-xs mb-1 opacity-70">
-                  {msg.type === "user" ? "You" : "AI Assistant"} - {msg.timestamp.toLocaleTimeString()}
-                </p>
-                {msg.text}
-                {msg.details && (
-                  <details className="mt-2 text-xs opacity-80">
-                    <summary>Details</summary>
-                    <pre className="whitespace-pre-wrap p-2 bg-background/50 rounded">
-                      {JSON.stringify(msg.details, null, 2)}
-                    </pre>
-                  </details>
-                )}
-              </div>
-            ))}
-          </div>
+        <ExpandableChatBody ref={chatBodyRef} className="p-4">
+          <ChatMessageList messages={messages} />
         </ExpandableChatBody>
         <ExpandableChatFooter>
           <div className="flex gap-2">

@@ -1,4 +1,3 @@
-
 import OpenAI from 'openai';
 // import { useToast } from "@/components/ui/use-toast"; // useToast is a hook, cannot be used here.
 import { generateProjectName } from "@/utils/projectNameGenerator";
@@ -46,7 +45,7 @@ export interface ExecutionPlan {
 }
 
 // IMPORTANT: Replace with your actual OpenRouter API key
-const OPENROUTER_API_KEY = "YOUR_OPENROUTER_API_KEY_HERE"; 
+const OPENROUTER_API_KEY = "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"; 
 const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Initialize OpenAI client for OpenRouter
@@ -90,7 +89,7 @@ export const generateExecutionPlan = async (
     console.log('Generating execution plan for:', projectName, 'using OpenRouter');
     console.log('User prompt:', userPrompt);
 
-    if (OPENROUTER_API_KEY === "YOUR_OPENROUTER_API_KEY_HERE") {
+    if (OPENROUTER_API_KEY === "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") {
       console.error("OpenRouter API key is not set. Please update it in src/services/aiService.ts");
       alert("OpenRouter API key is not configured. Please check the console and update the code. This app will not function correctly until this is resolved.");
       return null;
@@ -190,4 +189,3 @@ export const autoOptimize = async (
   console.log('Auto-optimization: Failed to generate an optimization plan.');
   return null;
 };
-
