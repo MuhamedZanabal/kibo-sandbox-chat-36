@@ -2,7 +2,8 @@
 import React from 'react';
 import { ChatMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
-import { type ExecutionResult, type CommandResult } from '@/services/executionService'; // Assuming ExecutionResult is exported
+import { type ExecutionResult, type CommandResult } from '@/services/executionService';
+import { type ExecutionPlan } from '@/services/aiService'; // Added ExecutionPlan import
 
 // Helper to check if details is an ExecutionResult
 const isExecutionResult = (details: any): details is ExecutionResult => {
@@ -12,6 +13,16 @@ const isExecutionResult = (details: any): details is ExecutionResult => {
     Array.isArray(details.commandResults) &&
     Array.isArray(details.logs) &&
     Array.isArray(details.errors)
+  );
+};
+
+// Helper to check if details is an ExecutionPlan
+const isExecutionPlan = (details: any): details is ExecutionPlan => {
+  return (
+    details &&
+    Array.isArray(details.commands) &&
+    Array.isArray(details.shell_commands) &&
+    typeof details.post_execution === 'object'
   );
 };
 
@@ -73,6 +84,48 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
     );
   };
 
+  const renderExecutionPlanDetails = (plan: ExecutionPlan) => {
+    return (
+      <div className="mt-2 text-xs opacity-90 space-y-2">
+        <p><strong>Execution Plan for Review:</strong></p>
+        
+        {plan.commands.length > 0 && (
+          <div>
+            <strong>File Operations:</strong>
+            <ul className="list-disc list-inside pl-4 space-y-1">
+              {plan.commands.map((cmd, index) => (
+                <li key={index}>
+                  {cmd.type.toUpperCase()} {cmd.path}
+                  {cmd.content && (
+                    <div className="pl-4 text-gray-400 text-[10px] break-all">
+                      Content: {truncateContent(cmd.content)}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {plan.shell_commands.length > 0 && (
+          <div>
+            <strong>Shell Commands (will be logged):</strong>
+            <ul className="list-disc list-inside pl-4 space-y-1">
+              {plan.shell_commands.map((shellCmd, index) => (
+                <li key={index} className="text-[10px]">
+                  {shellCmd.command}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+         {plan.commands.length === 0 && plan.shell_commands.length === 0 && (
+            <p>No operations in this plan.</p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className={cn(
@@ -85,12 +138,14 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
       <p className="font-semibold text-xs mb-1 opacity-70">
         {message.type === "user" ? "You" : "AI Assistant"} - {message.timestamp.toLocaleTimeString()}
       </p>
-      <div className="whitespace-pre-wrap">{message.text}</div> {/* Ensure message text also wraps */}
+      <div className="whitespace-pre-wrap">{message.text}</div>
       {message.details && (
-        <details className="mt-2 text-xs opacity-80">
+        <details className="mt-2 text-xs opacity-80" open={isExecutionPlan(message.details) || message.type === 'system_plan_review'}>
           <summary className="cursor-pointer">Details</summary>
           {isExecutionResult(message.details) ? (
             renderExecutionResultDetails(message.details)
+          ) : isExecutionPlan(message.details) ? (
+            renderExecutionPlanDetails(message.details)
           ) : (
             <pre className="whitespace-pre-wrap p-2 bg-background/50 rounded max-h-60 overflow-auto">
               {JSON.stringify(message.details, null, 2)}
@@ -107,3 +162,4 @@ interface ChatMessageItemProps {
 }
 
 export default ChatMessageItem;
+
