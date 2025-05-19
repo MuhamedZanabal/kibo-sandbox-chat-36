@@ -1,32 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import {
   SandboxProvider,
-  SandboxLayout,
-  SandboxTabs,
-  SandboxTabsList,
-  SandboxTabsTrigger,
-  SandboxTabsContent,
-  SandboxCodeEditor,
-  SandboxPreview,
-  SandboxConsole,
-  SandboxFileExplorer,
 } from "@/components/ui/sandbox";
 import { useSandpack } from "@codesandbox/sandpack-react";
-import {
-  ExpandableChat,
-  ExpandableChatHeader,
-  ExpandableChatBody,
-  ExpandableChatFooter,
-} from "@/components/ui/expandable-chat";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { generateProjectName } from "@/utils/projectNameGenerator";
 import { generateExecutionPlan, autoOptimize, type ExecutionPlan } from "@/services/aiService";
 import { executeFileCommands, type SandpackFileOperations, type ExecutionResult } from "@/services/executionService";
-import { cn } from "@/lib/utils";
 import { ChatMessage } from '@/types/chat';
-import ChatMessageList from '@/components/ChatMessageList';
+
+import SandboxView from "@/components/SandboxView";
+import ChatInterface from "@/components/ChatInterface";
 
 const IndexPageContent = () => {
   const { toast } = useToast();
@@ -39,7 +23,7 @@ const IndexPageContent = () => {
       timestamp: new Date(),
     },
   ]);
-  const [isProcessing, setIsProcessing] = useState(false); // True during plan gen, confirmation, and execution
+  const [isProcessing, setIsProcessing] = useState(false);
   const [currentProject, setCurrentProject] = useState(generateProjectName());
   
   const [pendingPlan, setPendingPlan] = useState<ExecutionPlan | null>(null);
@@ -80,6 +64,7 @@ const IndexPageContent = () => {
           text: `Auto-optimization plan generated (Commands: ${optimizationPlan.commands.length}). Executing...`,
           type: "system",
           timestamp: new Date(),
+          details: optimizationPlan, // Show opt plan details too
         }]);
         const optResult = await executeFileCommands(optimizationPlan, sandpackOps);
         optResult.logs.forEach(log => console.log("Optimization Log:", log));
@@ -91,8 +76,15 @@ const IndexPageContent = () => {
         toast({
           title: optResult.success ? "Optimization Successful" : "Optimization Issue",
           description: optResult.success ? "Code optimized." : "Optimization had issues. Check console.",
-          variant: optResult.success ? "default" : "default",
+          variant: optResult.success ? "default" : "default", // Keep "default" for non-destructive
         });
+         setMessages(prev => [...prev, { // Add message for optimization result
+          id: `${Date.now()}-opt-result`,
+          text: `Optimization Result: ${finalSystemMessageText.substring(finalSystemMessageText.indexOf("Auto-optimization"))}`,
+          type: "system",
+          timestamp: new Date(),
+          details: optResult 
+        }]);
       } else if (optimizationPlan && optimizationPlan.commands.length === 0) {
           finalSystemMessageText += "Auto-optimization analysis found no immediate actions to take.";
            toast({ title: "Optimization", description: "No optimization actions needed at this time." });
@@ -112,7 +104,7 @@ const IndexPageContent = () => {
     
     setMessages(prev => [...prev, {
       id: `${Date.now()}-result`,
-      text: finalSystemMessageText,
+      text: finalSystemMessageText.startsWith("Main changes applied successfully!") ? finalSystemMessageText : "Execution attempt finished.", // More generic if initial failed
       type: "system",
       timestamp: new Date(),
       details: executionResult
@@ -153,13 +145,12 @@ const IndexPageContent = () => {
         return;
       }
 
-      // Instead of executing, set for confirmation
       setPendingPlan(plan);
       setIsAwaitingConfirmation(true);
       setMessages(prev => [...prev, {
         id: `${Date.now()}-plan-review`,
         text: `Execution plan generated with ${plan.commands.length} file operations and ${plan.shell_commands.length} shell commands. Please review the details and approve or reject.`,
-        type: "system_plan_review", // Custom type for special rendering/handling
+        type: "system", // Corrected: Use "system" type
         timestamp: new Date(),
         details: plan 
       }]);
@@ -179,18 +170,16 @@ const IndexPageContent = () => {
         type: "system",
         timestamp: new Date(),
       }]);
-      setIsProcessing(false); // Release processing lock on critical error
+      setIsProcessing(false);
       setIsAwaitingConfirmation(false);
       setPendingPlan(null);
     } 
-    // Removed finally block for setIsProcessing(false) as it's now handled by approve/reject or error paths
   };
 
   const handleApprovePlan = async () => {
     if (!pendingPlan) return;
 
     setIsAwaitingConfirmation(false);
-    // isProcessing is already true
     
     setMessages(prev => [...prev, {
       id: `${Date.now()}-plan-approved`,
@@ -206,7 +195,7 @@ const IndexPageContent = () => {
       const errorText = error instanceof Error ? error.message : "An unknown error occurred during execution.";
       toast({
         variant: "destructive",
-        title: "Execution Critical Error",
+        title: "Execution CriticalError",
         description: `Failed to execute approved plan: ${errorText}`,
       });
        setMessages(prev => [...prev, {
@@ -217,7 +206,7 @@ const IndexPageContent = () => {
       }]);
     } finally {
       setPendingPlan(null);
-      setIsProcessing(false); // Release lock after all operations
+      setIsProcessing(false); 
     }
   };
 
@@ -230,20 +219,38 @@ const IndexPageContent = () => {
       type: "system",
       timestamp: new Date(),
     }]);
-    setIsProcessing(false); // Release lock
+    setIsProcessing(false);
   };
   
   useEffect(() => {
-    sandpack.updateFile("/App.js", `export default function App() {
+    const appTsxContent = `
+import React from 'react';
+// Ensure styles.css is created or remove this import if not used
+// import './styles.css'; 
+
+export default function App() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">
         Project: ${currentProject}
       </h1>
-      <p>Start editing to see your changes!</p>
+      <p>Welcome to your project! Start by asking the AI to make changes.</p>
+      <p className="mt-4 text-sm text-muted-foreground">
+        For example: "Create a new component called MyButton with green background and text 'Click Me'. Then use it in App.tsx."
+      </p>
     </div>
   );
-}`);
+}`;
+    // Check if App.tsx exists before updating, or ensure it's the active/intended entry.
+    // The initial setup creates App.tsx. This will update it.
+    if (sandpack.files["/App.tsx"]) {
+        sandpack.updateFile("/App.tsx", appTsxContent);
+    } else {
+        // If App.tsx doesn't exist for some reason, create it.
+        // This branch might be unlikely given SandpackProvider setup.
+        sandpack.addFile("/App.tsx", appTsxContent);
+    }
+
   }, [currentProject, sandpack]);
 
   useEffect(() => {
@@ -255,72 +262,21 @@ const IndexPageContent = () => {
   return (
     <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
       <main className="flex-1 p-4 overflow-hidden">
-        <SandboxLayout>
-          <SandboxTabs defaultValue="editor">
-            <SandboxTabsList>
-              <SandboxTabsTrigger value="editor">Editor</SandboxTabsTrigger>
-              <SandboxTabsTrigger value="preview">Preview</SandboxTabsTrigger>
-              <SandboxTabsTrigger value="console">Console</SandboxTabsTrigger>
-            </SandboxTabsList>
-            <SandboxTabsContent value="editor" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]">
-              <div className="grid grid-cols-4 h-full">
-                <div className="col-span-1 border-r">
-                  <SandboxFileExplorer />
-                </div>
-                <div className="col-span-3">
-                  <SandboxCodeEditor />
-                </div>
-              </div>
-            </SandboxTabsContent>
-            <SandboxTabsContent value="preview" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]">
-              <SandboxPreview />
-            </SandboxTabsContent>
-            <SandboxTabsContent value="console" className="h-[calc(100vh-200px)] md:h-[calc(100vh-250px)]">
-              <SandboxConsole />
-            </SandboxTabsContent>
-          </SandboxTabs>
-        </SandboxLayout>
+        <SandboxView />
       </main>
-
-      <ExpandableChat>
-        <ExpandableChatHeader>
-          <h3 className="text-lg font-semibold">AI Engineer Assistant ({currentProject})</h3>
-        </ExpandableChatHeader>
-        <ExpandableChatBody ref={chatBodyRef} className="p-4">
-          <ChatMessageList messages={messages} />
-        </ExpandableChatBody>
-        <ExpandableChatFooter>
-          {isAwaitingConfirmation && pendingPlan ? (
-            <div className="flex gap-2 w-full items-center">
-              <p className="text-sm flex-grow">Awaiting plan confirmation.</p>
-              <Button onClick={handleApprovePlan} size="lg" variant="default" className="bg-green-600 hover:bg-green-700">
-                Approve Plan
-              </Button>
-              <Button onClick={handleRejectPlan} size="lg" variant="destructive">
-                Reject Plan
-              </Button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Describe the changes you want to make..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && !isAwaitingConfirmation && handleSendMessage()}
-                className="flex-1"
-                disabled={isProcessing || isAwaitingConfirmation}
-              />
-              <Button 
-                onClick={handleSendMessage}
-                disabled={isProcessing || isAwaitingConfirmation}
-                size="lg"
-              >
-                {isProcessing ? "Processing..." : "Send"}
-              </Button>
-            </div>
-          )}
-        </ExpandableChatFooter>
-      </ExpandableChat>
+      <ChatInterface
+        currentProject={currentProject}
+        chatBodyRef={chatBodyRef}
+        messages={messages}
+        isAwaitingConfirmation={isAwaitingConfirmation}
+        pendingPlan={pendingPlan}
+        handleApprovePlan={handleApprovePlan}
+        handleRejectPlan={handleRejectPlan}
+        message={message}
+        setMessage={setMessage}
+        handleSendMessage={handleSendMessage}
+        isProcessing={isProcessing}
+      />
     </div>
   );
 };
@@ -360,7 +316,7 @@ export default function App() {
           code: `import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-// import './styles.css'; 
+// import './styles.css'; // Ensure this file exists if uncommented
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Failed to find the root element');
@@ -372,6 +328,8 @@ root.render(
   </React.StrictMode>
 );`,
         },
+        // It's good practice to have a styles.css, even if empty initially, if it's imported.
+        // "/styles.css": { code: `/* Add your global styles here */` } 
       }}
       options={{
         activeFile: "/App.tsx", 

@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { ChatMessage } from '@/types/chat';
 import { cn } from '@/lib/utils';
-import { type ExecutionResult, type CommandResult } from '@/services/executionService';
-import { type ExecutionPlan } from '@/services/aiService'; // Added ExecutionPlan import
+import { type ExecutionResult, type CommandResult } from '@/services/executionService'; // Assuming CommandResult is exported if needed here
+import { type ExecutionPlan } from '@/services/aiService';
 
 // Helper to check if details is an ExecutionResult
 const isExecutionResult = (details: any): details is ExecutionResult => {
@@ -22,7 +21,7 @@ const isExecutionPlan = (details: any): details is ExecutionPlan => {
     details &&
     Array.isArray(details.commands) &&
     Array.isArray(details.shell_commands) &&
-    typeof details.post_execution === 'object'
+    details.post_execution !== undefined // Check if post_execution exists (can be null or object)
   );
 };
 
@@ -42,7 +41,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
         
         {details.commandResults.length > 0 && (
           <div>
-            <strong>Commands:</strong>
+            <strong>Commands Executed:</strong>
             <ul className="list-disc list-inside pl-4 space-y-1">
               {details.commandResults.map((cmdResult, index) => (
                 <li key={index} className={cn(cmdResult.success ? "" : "text-red-500")}>
@@ -91,7 +90,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
         
         {plan.commands.length > 0 && (
           <div>
-            <strong>File Operations:</strong>
+            <strong>File Operations Proposed:</strong>
             <ul className="list-disc list-inside pl-4 space-y-1">
               {plan.commands.map((cmd, index) => (
                 <li key={index}>
@@ -140,7 +139,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
       </p>
       <div className="whitespace-pre-wrap">{message.text}</div>
       {message.details && (
-        <details className="mt-2 text-xs opacity-80" open={isExecutionPlan(message.details) || message.type === 'system_plan_review'}>
+        <details className="mt-2 text-xs opacity-80" open={isExecutionPlan(message.details)}> {/* Corrected: open based on if it's a plan */}
           <summary className="cursor-pointer">Details</summary>
           {isExecutionResult(message.details) ? (
             renderExecutionResultDetails(message.details)
@@ -162,4 +161,3 @@ interface ChatMessageItemProps {
 }
 
 export default ChatMessageItem;
-
