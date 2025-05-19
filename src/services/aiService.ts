@@ -88,13 +88,7 @@ export const generateExecutionPlan = async (
   try {
     console.log('Generating execution plan for:', projectName, 'using OpenRouter');
     console.log('User prompt:', userPrompt);
-
-    if (OPENROUTER_API_KEY === "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") {
-      console.error("OpenRouter API key is not set. Please update it in src/services/aiService.ts");
-      alert("OpenRouter API key is not configured. Please check the console and update the code. This app will not function correctly until this is resolved.");
-      return null;
-    }
-
+    
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -107,10 +101,10 @@ export const generateExecutionPlan = async (
     ];
 
     const response = await openai.chat.completions.create({
-      model: 'qwen/qwen-2.5-coder-32b-instruct', 
+      model: 'google/gemini-2.5-flash-preview', 
       messages: messages,
-      temperature: 0.3,
-      max_tokens: 2000, // Increased max_tokens for potentially larger plans
+      temperature: 0.01,
+      max_tokens: 8000, // Increased max_tokens for potentially larger plans
       response_format: { type: "json_object" },
     });
 
