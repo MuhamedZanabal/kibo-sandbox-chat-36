@@ -1,4 +1,3 @@
-
 import { type ExecutionPlan } from './aiService';
 
 // Interface for the Sandpack file operations we need
@@ -10,14 +9,14 @@ export interface SandpackFileOperations {
 }
 
 // Interface for the result of a single command execution
-export interface CommandResult {
+export interface CommandResult { // Ensure this is exported
   command: ExecutionPlan['commands'][0];
   success: boolean;
   error?: string;
 }
 
 // Interface for the overall execution result
-export interface ExecutionResult {
+export interface ExecutionResult { // Ensure this is exported
   success: boolean; // Overall success of all commands
   commandResults: CommandResult[];
   logs: string[]; // General logs from the execution process
@@ -107,4 +106,3 @@ export const executeFileCommands = async (
     errors,
   };
 };
-
