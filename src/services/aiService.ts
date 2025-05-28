@@ -45,7 +45,7 @@ export interface ExecutionPlan {
 }
 
 // IMPORTANT: Replace with your actual OpenRouter API key
-const OPENROUTER_API_KEY = "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"; 
+const OPENROUTER_API_KEY = ""; 
 const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Initialize OpenAI client for OpenRouter
